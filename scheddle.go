@@ -149,10 +149,10 @@ type Options struct {
 	// decisions. By default, the queue uses [time.Now].
 	TimeNow func() time.Time
 
-	// Run, if non-nil, is called for eligible task by the scheduler, to execute
-	// the task. The default calls the task function directly. You can override
-	// this to schedule tasks to run in separate goroutines, or to handle common
-	// task plumbing.
+	// Run, if non-nil, is called for each eligible task by the scheduler, to
+	// execute the task. The default calls the task function directly. You can
+	// override this to schedule tasks to run in separate goroutines, or to
+	// handle common task plumbing.
 	Run func(Task)
 }
 
