@@ -101,7 +101,7 @@ func TestQueue_basic(t *testing.T) {
 }
 
 func TestQueue_run(t *testing.T) {
-	g, start := taskgroup.New(nil).Limit(1)
+	g, start := taskgroup.New(nil).Limit(4)
 
 	q := scheddle.NewQueue(&scheddle.Options{
 		Run: func(t scheddle.Task) {
