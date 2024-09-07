@@ -49,7 +49,7 @@ func NewQueue(opts *Options) *Queue {
 	t := time.NewTimer(0)
 	t.Stop()
 	q := &Queue{
-		now:    opts.timeNow(),
+		now:    time.Now,
 		timer:  t,
 		cancel: cancel,
 		done:   make(chan struct{}),
@@ -139,16 +139,6 @@ type entry struct {
 func compareEntries(a, b entry) int { return a.due.Compare(b.due) }
 
 // Options are optional settings for a [Queue]. A nil Options is ready for use
-// and provides default values as described.
-type Options struct {
-	// TimeNow, if non-nil, is used as the time source for evaluating scheduling
-	// decisions. By default, the queue uses [time.Now].
-	TimeNow func() time.Time
-}
-
-func (o *Options) timeNow() func() time.Time {
-	if o != nil {
-		return o.TimeNow
-	}
-	return nil
-}
+// and provides default values as described.  There are currently no options to
+// set; this is reserved for future expansion.
+type Options struct{}
