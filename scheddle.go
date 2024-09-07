@@ -14,7 +14,13 @@
 //	// Specify an elapsed time with After.
 //	q.After(10*time.Minute, task2)
 //
-// To stop the scheduler and discard any remaining tasks, use
+// A [Task] is any value exporting a Run method with the signature:
+//
+//	Run(context.Context) error
+//
+// You can adapt existing functions to this type using [Run].
+//
+// To stop the scheduler and discard any remaining tasks, use:
 //
 //	q.Close()
 //
@@ -127,7 +133,7 @@ func (q *Queue) schedule(ctx context.Context) {
 				// Process as many due tasks as are available.
 				next, ok := q.popReady()
 				if ok {
-					if err := next.task.Run(); err == nil {
+					if err := next.task.Run(ctx); err == nil {
 						if r, ok := next.task.(Rescheduler); ok {
 							r.Reschedule(q)
 						}

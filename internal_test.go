@@ -37,7 +37,7 @@ func TestQueue_basic(t *testing.T) {
 
 	vals := make(chan int)
 	push := func(n int) Task {
-		return T(func() {
+		return Run(func() {
 			t.Logf("[task] push %d", n)
 			vals <- n
 		})

@@ -24,7 +24,7 @@ func TestQueue_run(t *testing.T) {
 	vals := make([]int, numTasks)
 	for i := range vals {
 		dur := rand.N(tick) - time.Millisecond
-		q.After(dur, scheddle.T(func() {
+		q.After(dur, scheddle.Run(func() {
 			start(func() error {
 				t.Logf("task %d (after %v)", i+1, dur)
 				vals[i] = i + 1
@@ -53,7 +53,7 @@ func TestQueue_repeat(t *testing.T) {
 
 	var runs int
 	q.After(10*time.Millisecond, &scheddle.Repeat{
-		Task:  scheddle.T(func() { runs++ }),
+		Task:  scheddle.Run(func() { runs++ }),
 		Every: 20 * time.Millisecond,
 		Count: 5,
 		End:   time.Now().Add(50 * time.Millisecond),

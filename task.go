@@ -3,23 +3,27 @@
 package scheddle
 
 import (
+	"context"
 	"fmt"
 	"time"
 )
 
-// T adapts val to a Task. If the concrete type of val satisfies the Task
+// Run adapts f to a Task. If the concrete type of f satisfies the Task
 // interface, it is returned directly; otherwise val must be one of:
 //
 //	func()
 //	func() error
+//	func(context.Context) error
 //
-// Either of these types is converted into a Task that runs the function once.
-// For any other type, T will panic.
-func T(val any) Task {
+// Any of these types is converted into a Task that runs the function.  For any
+// other type, Run will panic.
+func Run(val any) Task {
 	switch t := val.(type) {
 	case func():
-		return runThunk(t)
+		return runFunc(func(context.Context) error { t(); return nil })
 	case func() error:
+		return runFunc(func(context.Context) error { return t() })
+	case func(context.Context) error:
 		return runFunc(t)
 	case Task:
 		return t
@@ -66,21 +70,18 @@ func (r *Repeat) Reschedule(q *Queue) {
 }
 
 // A runFunc is a Task that runs by calling the function.
-type runFunc func() error
+type runFunc func(context.Context) error
 
 // Run executes the task by calling f.
-func (f runFunc) Run() error { return f() }
-
-// A runThunk is a Task that runs by calling the function and reporting nil.
-type runThunk func()
-
-func (f runThunk) Run() error { f(); return nil }
+func (f runFunc) Run(ctx context.Context) error { return f(ctx) }
 
 // A Task represents a unit of work that can be scheduled by a [Queue].
 // When a task reaches the front of the queue, the scheduler calls Run.
 type Task interface {
-	// Run executes the task and reports success (nil) or an error.
-	Run() error
+	// Run executes the task and reports success (nil) or an error.  The context
+	// passed to Run will be cancelled if the task is executing when the Queue
+	// is closed.
+	Run(context.Context) error
 }
 
 // Rescheduler is an optional interface that may be implemented by a [Task].
