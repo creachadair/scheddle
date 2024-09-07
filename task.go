@@ -18,9 +18,9 @@ import (
 func T(val any) Task {
 	switch t := val.(type) {
 	case func():
-		return taskFunc(func() error { t(); return nil })
+		return runThunk(t)
 	case func() error:
-		return taskFunc(t)
+		return runFunc(t)
 	case Task:
 		return t
 	default:
@@ -65,11 +65,16 @@ func (r *Repeat) Reschedule(q *Queue) {
 	q.After(r.Every, r)
 }
 
-// A taskFunc is a Task that runs by calling the function.
-type taskFunc func() error
+// A runFunc is a Task that runs by calling the function.
+type runFunc func() error
 
 // Run executes the task by calling f.
-func (f taskFunc) Run() error { return f() }
+func (f runFunc) Run() error { return f() }
+
+// A runThunk is a Task that runs by calling the function and reporting nil.
+type runThunk func()
+
+func (f runThunk) Run() error { f(); return nil }
 
 // A Task represents a unit of work that can be scheduled by a [Queue].
 // When a task reaches the front of the queue, the scheduler calls Run.

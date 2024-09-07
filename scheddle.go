@@ -14,10 +14,13 @@
 //	// Specify an elapsed time with After.
 //	q.After(10*time.Minute, task2)
 //
-// Tasks are executed sequentially in time order by a single goroutine that runs
-// in the background. To stop the scheduler and discard any pending tasks, use
+// To stop the scheduler and discard any remaining tasks, use
 //
 //	q.Close()
+//
+// To wait for the queue to become empty without interrupting the scheduler, use:
+//
+//	q.Wait(ctx)
 package scheddle
 
 import (
@@ -29,9 +32,17 @@ import (
 	"github.com/creachadair/msync"
 )
 
-// A Queue implements a basic time-based task queue.
-// Add tasks to the queue using [Add] and [After].
-// Call [Close] to close down the scheduler.
+// A Queue implements a basic time-based task queue. Add tasks to the queue
+// using [At] and [After]. Call [Close] to close down the scheduler.
+//
+// A Queue executes tasks sequentially, in time order, with a single goroutine
+// that runs in the background. If multiple tasks are due at exactly the same
+// time, the scheduler will execute them in unspecified order.
+//
+// Each task is executed fully before another task is considered, so a Task can
+// safely modify its own state without locking.  Tasks that wish to execute in
+// parallel may start additional goroutines, but then must manage their own
+// state and lifecycle appropriately.
 type Queue struct {
 	// Initialized at construction.
 	now    func() time.Time
