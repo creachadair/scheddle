@@ -41,11 +41,11 @@ func TestQueue_basic(t *testing.T) {
 	defer q.Close()
 
 	vals := make(chan int)
-	push := func(n int) func() {
-		return func() {
+	push := func(n int) scheddle.Task {
+		return scheddle.T(func() {
 			t.Logf("[task] push %d", n)
 			vals <- n
-		}
+		})
 	}
 	want := func(want int) {
 		got, ok := <-vals
@@ -115,31 +115,30 @@ func TestQueue_basic(t *testing.T) {
 }
 
 func TestQueue_run(t *testing.T) {
-	g, start := taskgroup.New(nil).Limit(4)
+	q := scheddle.NewQueue(nil)
 
-	q := scheddle.NewQueue(&scheddle.Options{
-		Run: func(t scheddle.Task) {
-			start(taskgroup.NoError(t))
-		},
-	})
+	g, start := taskgroup.New(nil).Limit(4)
 
 	const numTasks = 20
 	const tick = 10 * time.Millisecond
 
 	done := make(chan struct{})
-	q.After(numTasks*tick, func() {
+	q.After(numTasks*tick, scheddle.T(func() {
 		t.Log("All tasks scheduled")
 		close(done)
-	})
+	}))
 	defer q.Close()
 
 	vals := make([]int, numTasks)
 	for i := range vals {
 		dur := rand.N(tick) - time.Millisecond
-		q.After(dur, func() {
-			t.Logf("task %d (after %v)", i+1, dur)
-			vals[i] = i + 1
-		})
+		q.After(dur, scheddle.T(func() {
+			start(func() error {
+				t.Logf("task %d (after %v)", i+1, dur)
+				vals[i] = i + 1
+				return nil
+			})
+		}))
 	}
 
 	<-done
@@ -153,5 +152,29 @@ func TestQueue_run(t *testing.T) {
 	}
 	if want := (numTasks * (numTasks + 1)) / 2; sum != want {
 		t.Errorf("Checksum is %d, want %d", sum, want)
+	}
+}
+
+func TestQueue_repeat(t *testing.T) {
+	q := scheddle.NewQueue(nil)
+	defer q.Close()
+
+	var runs int
+	q.After(10*time.Millisecond, &scheddle.Repeat{
+		Task:  scheddle.T(func() { runs++ }),
+		Every: 20 * time.Millisecond,
+		Count: 5,
+		End:   time.Now().Add(50 * time.Millisecond),
+	})
+
+	done := make(chan struct{})
+	q.After(100*time.Millisecond, scheddle.T(func() {
+		close(done)
+	}))
+
+	<-done
+
+	if want := 3; runs != want {
+		t.Errorf("Got %d runs, want %d", runs, want)
 	}
 }

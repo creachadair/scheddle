@@ -34,7 +34,6 @@ import (
 type Queue struct {
 	// Initialized at construction.
 	now    func() time.Time
-	run    func(Task)
 	timer  *time.Timer
 	cancel context.CancelFunc
 	done   chan struct{}
@@ -42,9 +41,6 @@ type Queue struct {
 	μ    sync.Mutex
 	todo *heapq.Queue[entry]
 }
-
-// Task is a unit of schedulable work in a [Queue].
-type Task func()
 
 // NewQueue constructs a new empty [Queue] with the specified options.
 // If opts == nil, default options are provided as described by [Options].
@@ -54,7 +50,6 @@ func NewQueue(opts *Options) *Queue {
 	t.Stop()
 	q := &Queue{
 		now:    opts.timeNow(),
-		run:    opts.runFunc(),
 		timer:  t,
 		cancel: cancel,
 		done:   make(chan struct{}),
@@ -84,11 +79,10 @@ func (q *Queue) At(due time.Time, task Task) {
 
 // After schedules task to be executed after the specified duration.
 // If d ≤ 0, the task will be immediately eligible to run.
-func (q *Queue) After(d time.Duration, task Task) {
-	q.At(q.timeNow().Add(d), task)
-}
+func (q *Queue) After(d time.Duration, task Task) { q.At(q.Now().Add(d), task) }
 
-func (q *Queue) timeNow() time.Time {
+// Now reports the current time as observed by q.
+func (q *Queue) Now() time.Time {
 	if q.now == nil {
 		return time.Now()
 	}
@@ -105,14 +99,16 @@ func (q *Queue) schedule(ctx context.Context) {
 			for {
 				next, ok := q.popReady()
 				if ok {
-					q.run(next.task)
+					if err := next.task.Run(); err == nil {
+						next.task.Reschedule(q)
+					}
 					continue // check for another due task
 				}
 
 				// No more due tasks. If there is a pending task, it is in the
 				// future, so set a wakeup for then.
 				if !next.due.IsZero() {
-					q.timer.Reset(next.due.Sub(q.timeNow()))
+					q.timer.Reset(next.due.Sub(q.Now()))
 				}
 				break
 			}
@@ -127,7 +123,7 @@ func (q *Queue) popReady() (entry, bool) {
 	q.μ.Lock()
 	defer q.μ.Unlock()
 	next, ok := q.todo.Peek(0)
-	if !ok || next.due.After(q.timeNow()) {
+	if !ok || next.due.After(q.Now()) {
 		return next, false
 	}
 	q.todo.Pop()
@@ -148,12 +144,6 @@ type Options struct {
 	// TimeNow, if non-nil, is used as the time source for evaluating scheduling
 	// decisions. By default, the queue uses [time.Now].
 	TimeNow func() time.Time
-
-	// Run, if non-nil, is called for each eligible task by the scheduler, to
-	// execute the task. The default calls the task function directly. You can
-	// override this to schedule tasks to run in separate goroutines, or to
-	// handle common task plumbing.
-	Run func(Task)
 }
 
 func (o *Options) timeNow() func() time.Time {
@@ -161,11 +151,4 @@ func (o *Options) timeNow() func() time.Time {
 		return o.TimeNow
 	}
 	return nil
-}
-
-func (o *Options) runFunc() func(Task) {
-	if o == nil || o.Run == nil {
-		return func(t Task) { t() }
-	}
-	return o.Run
 }
