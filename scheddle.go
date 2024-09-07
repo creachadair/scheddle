@@ -108,8 +108,9 @@ func (q *Queue) At(due time.Time, task Task) {
 	q.μ.Lock()
 	defer q.μ.Unlock()
 
-	q.todo.Add(entry{due: due, task: task})
-	q.timer.Reset(0)
+	if q.todo.Add(entry{due: due, task: task}) == 0 {
+		q.timer.Reset(0) // wake up the scheduler
+	}
 }
 
 // After schedules task to be executed after the specified duration.
