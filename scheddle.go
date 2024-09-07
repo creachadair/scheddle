@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/creachadair/mds/heapq"
+	"github.com/creachadair/msync"
 )
 
 // A Queue implements a basic time-based task queue.
@@ -37,6 +38,7 @@ type Queue struct {
 	timer  *time.Timer
 	cancel context.CancelFunc
 	done   chan struct{}
+	empty  *msync.Trigger
 
 	μ    sync.Mutex
 	todo *heapq.Queue[entry]
@@ -49,10 +51,11 @@ func NewQueue(opts *Options) *Queue {
 	t := time.NewTimer(0)
 	t.Stop()
 	q := &Queue{
-		now:    time.Now,
+		now:    time.Now, // hooked for testing; see internal_test.go
 		timer:  t,
 		cancel: cancel,
 		done:   make(chan struct{}),
+		empty:  msync.NewTrigger(),
 		todo:   heapq.New(compareEntries),
 	}
 	go q.schedule(ctx)
@@ -65,6 +68,19 @@ func (q *Queue) Close() error {
 	q.cancel()
 	<-q.done
 	return nil
+}
+
+// Wait blocks until the queue is empty and the scheduler is idle, or ctx ends.
+// If ctx ends before the queue is empty, Wait returns false; otherwise true.
+// Note that this does not close the queue or prevent more tasks from being
+// added.
+func (q *Queue) Wait(ctx context.Context) bool {
+	select {
+	case <-ctx.Done():
+		return false
+	case <-q.empty.Ready():
+		return true
+	}
 }
 
 // At schedules task to be executed at the specified time.  If due is in the
@@ -97,6 +113,7 @@ func (q *Queue) schedule(ctx context.Context) {
 			return
 		case <-q.timer.C:
 			for {
+				// Process as many due tasks as are available.
 				next, ok := q.popReady()
 				if ok {
 					if err := next.task.Run(); err == nil {
@@ -107,9 +124,15 @@ func (q *Queue) schedule(ctx context.Context) {
 					continue // check for another due task
 				}
 
-				// No more due tasks. If there is a pending task, it is in the
-				// future, so set a wakeup for then.
-				if !next.due.IsZero() {
+				// Reaching here, no more tasks are due -- either the next task is
+				// in the future, or the queue is (at least momentarily) empty.
+				//
+				// If next.task == nil, it means we got a zero entry due to an
+				// empty queue; otherwise the task was in the future, at least as
+				// of the moment when we looked at it.
+				if next.task == nil {
+					q.empty.Signal()
+				} else {
 					q.timer.Reset(next.due.Sub(q.Now()))
 				}
 				break

@@ -3,6 +3,7 @@
 package scheddle_test
 
 import (
+	"context"
 	"math/rand/v2"
 	"testing"
 	"time"
@@ -13,18 +14,12 @@ import (
 
 func TestQueue_run(t *testing.T) {
 	q := scheddle.NewQueue(nil)
+	defer q.Close()
 
 	g, start := taskgroup.New(nil).Limit(4)
 
 	const numTasks = 20
 	const tick = 10 * time.Millisecond
-
-	done := make(chan struct{})
-	q.After(numTasks*tick, scheddle.T(func() {
-		t.Log("All tasks scheduled")
-		close(done)
-	}))
-	defer q.Close()
 
 	vals := make([]int, numTasks)
 	for i := range vals {
@@ -38,7 +33,7 @@ func TestQueue_run(t *testing.T) {
 		}))
 	}
 
-	<-done
+	q.Wait(context.Background())
 	g.Wait()
 
 	// Verify that all the tasks got their values in, i.e., that none of the
@@ -63,13 +58,7 @@ func TestQueue_repeat(t *testing.T) {
 		Count: 5,
 		End:   time.Now().Add(50 * time.Millisecond),
 	})
-
-	done := make(chan struct{})
-	q.After(100*time.Millisecond, scheddle.T(func() {
-		close(done)
-	}))
-
-	<-done
+	q.Wait(context.Background())
 
 	if want := 3; runs != want {
 		t.Errorf("Got %d runs, want %d", runs, want)
