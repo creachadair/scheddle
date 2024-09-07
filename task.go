@@ -68,22 +68,20 @@ func (r *Repeat) Reschedule(q *Queue) {
 // A taskFunc is a Task that runs by calling the function.
 type taskFunc func() error
 
-// Reschedule implements part of the [Task] interface. It is a noop.
-func (taskFunc) Reschedule(*Queue) {}
-
 // Run executes the task by calling f.
 func (f taskFunc) Run() error { return f() }
 
 // A Task represents a unit of work that can be scheduled by a [Queue].
-//
-// When a task reaches the front of the queue, the scheduler calls Run.  If Run
-// succeeds, the scheduler calls Reschedule to give the task an opportunity to
-// reschedule itself. If Run fails, Reschedule is not called.
+// When a task reaches the front of the queue, the scheduler calls Run.
 type Task interface {
-	// Run executes the task. If Run reports nil, the task succeeds, otherwise
-	// it fails.
+	// Run executes the task and reports success (nil) or an error.
 	Run() error
+}
 
-	// Reschedule allows the task to reschedule itself or other tasks.
+// Rescheduler is an optional interface that may be implemented by a [Task].
+// If so, then whenever the task successfully completes, its Reschedule method
+// is called to allow it to reschedule itself or other tasks.
+type Rescheduler interface {
+	// Reschedule allows the receiver to add new tasks to q, if it wishes.
 	Reschedule(q *Queue)
 }

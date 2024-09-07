@@ -100,7 +100,9 @@ func (q *Queue) schedule(ctx context.Context) {
 				next, ok := q.popReady()
 				if ok {
 					if err := next.task.Run(); err == nil {
-						next.task.Reschedule(q)
+						if r, ok := next.task.(Rescheduler); ok {
+							r.Reschedule(q)
+						}
 					}
 					continue // check for another due task
 				}
