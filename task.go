@@ -28,7 +28,7 @@ func Run(f any) Task {
 	case Task:
 		return t
 	default:
-		panic(fmt.Sprintf("cannot convert %T to a Task", val))
+		panic(fmt.Sprintf("cannot convert %T to a Task", f))
 	}
 }
 
