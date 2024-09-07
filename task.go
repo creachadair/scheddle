@@ -9,7 +9,7 @@ import (
 )
 
 // Run adapts f to a Task. If the concrete type of f satisfies the Task
-// interface, it is returned directly; otherwise val must be one of:
+// interface, it is returned directly; otherwise f must be one of:
 //
 //	func()
 //	func() error
@@ -17,8 +17,8 @@ import (
 //
 // Any of these types is converted into a Task that runs the function.  For any
 // other type, Run will panic.
-func Run(val any) Task {
-	switch t := val.(type) {
+func Run(f any) Task {
+	switch t := f.(type) {
 	case func():
 		return runFunc(func(context.Context) error { t(); return nil })
 	case func() error:
