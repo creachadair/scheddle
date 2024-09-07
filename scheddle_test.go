@@ -64,3 +64,15 @@ func TestQueue_repeat(t *testing.T) {
 		t.Errorf("Got %d runs, want %d", runs, want)
 	}
 }
+
+func TestQueue_waitAfterClose(t *testing.T) {
+	q := scheddle.NewQueue(nil)
+	q.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	if !q.Wait(ctx) {
+		t.Errorf("Timed out waiting for queue: %v", ctx.Err())
+	}
+}

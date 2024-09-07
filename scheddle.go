@@ -95,8 +95,10 @@ func (q *Queue) Wait(ctx context.Context) bool {
 	select {
 	case <-ctx.Done():
 		return false
+	case <-q.done:
+		return true // queue is closed
 	case <-q.empty.Ready():
-		return true
+		return true // queue is empty
 	}
 }
 
@@ -115,12 +117,7 @@ func (q *Queue) At(due time.Time, task Task) {
 func (q *Queue) After(d time.Duration, task Task) { q.At(q.Now().Add(d), task) }
 
 // Now reports the current time as observed by q.
-func (q *Queue) Now() time.Time {
-	if q.now == nil {
-		return time.Now()
-	}
-	return q.now()
-}
+func (q *Queue) Now() time.Time { return q.now() }
 
 func (q *Queue) schedule(ctx context.Context) {
 	defer close(q.done)
