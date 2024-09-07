@@ -8,8 +8,8 @@
 //
 //	q := scheddle.NewQueue(nil) // nil for default options
 //
-//	// Specify a specific due time with Add.
-//	q.Add(dueTime, task1)
+//	// Specify a specific due time with At.
+//	q.At(dueTime, task1)
 //
 //	// Specify an elapsed time with After.
 //	q.After(10*time.Minute, task2)
@@ -72,9 +72,9 @@ func (q *Queue) Close() error {
 	return nil
 }
 
-// Add schedules task to be executed at the specified time.  If due is in the
+// At schedules task to be executed at the specified time.  If due is in the
 // past, the task will be immediately eligible to run.
-func (q *Queue) Add(due time.Time, task Task) {
+func (q *Queue) At(due time.Time, task Task) {
 	q.μ.Lock()
 	defer q.μ.Unlock()
 
@@ -85,7 +85,7 @@ func (q *Queue) Add(due time.Time, task Task) {
 // After schedules task to be executed after the specified duration.
 // If d ≤ 0, the task will be immediately eligible to run.
 func (q *Queue) After(d time.Duration, task Task) {
-	q.Add(q.timeNow().Add(d), task)
+	q.At(q.timeNow().Add(d), task)
 }
 
 func (q *Queue) timeNow() time.Time {
