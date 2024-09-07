@@ -53,7 +53,7 @@ type Repeat struct {
 	runs int // number of runs elapsed so far
 }
 
-// Reschedule implements part of the [Task] interface. In this implementation,
+// Reschedule implements the [Rescheduler] interface. In this implementation,
 // it reschedules r if it has not yet used up its run count, and the time is
 // prior to the specified ending time.
 func (r *Repeat) Reschedule(q *Queue) {
