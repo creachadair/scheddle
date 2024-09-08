@@ -65,14 +65,27 @@ func TestQueue_repeat(t *testing.T) {
 	}
 }
 
-func TestQueue_waitAfterClose(t *testing.T) {
-	q := scheddle.NewQueue(nil)
-	q.Close()
+func TestQueue_Wait(t *testing.T) {
+	t.Run("BeforeFirst", func(t *testing.T) {
+		q := scheddle.NewQueue(nil)
+		defer q.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
 
-	if !q.Wait(ctx) {
-		t.Errorf("Timed out waiting for queue: %v", ctx.Err())
-	}
+		if !q.Wait(ctx) {
+			t.Errorf("Timed out waiting for queue: %v", ctx.Err())
+		}
+	})
+	t.Run("AfterClose", func(t *testing.T) {
+		q := scheddle.NewQueue(nil)
+		q.Close()
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+
+		if !q.Wait(ctx) {
+			t.Errorf("Timed out waiting for queue: %v", ctx.Err())
+		}
+	})
 }

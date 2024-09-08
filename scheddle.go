@@ -55,10 +55,10 @@ type Queue struct {
 	timer  *time.Timer
 	cancel context.CancelFunc
 	done   chan struct{}
-	empty  *msync.Trigger
 
 	μ    sync.Mutex
 	todo *heapq.Queue[entry]
+	idle msync.Trigger
 }
 
 // NewQueue constructs a new empty [Queue] with the specified options.
@@ -72,9 +72,9 @@ func NewQueue(opts *Options) *Queue {
 		timer:  t,
 		cancel: cancel,
 		done:   make(chan struct{}),
-		empty:  msync.NewTrigger(),
 		todo:   heapq.New(compareEntries),
 	}
+	q.idle.Set() // initially idle
 	go q.schedule(ctx)
 	return q
 }
@@ -97,8 +97,8 @@ func (q *Queue) Wait(ctx context.Context) bool {
 		return false
 	case <-q.done:
 		return true // queue is closed
-	case <-q.empty.Ready():
-		return true // queue is empty
+	case <-q.idle.Ready():
+		return true
 	}
 }
 
@@ -109,7 +109,9 @@ func (q *Queue) At(due time.Time, task Task) {
 	defer q.μ.Unlock()
 
 	if q.todo.Add(entry{due: due, task: task}) == 0 {
-		q.timer.Reset(0) // wake up the scheduler
+		// Wake up the scheduler.
+		q.idle.Reset()
+		q.timer.Reset(0)
 	}
 }
 
@@ -127,6 +129,7 @@ func (q *Queue) schedule(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-q.timer.C:
+			q.idle.Reset()
 			for {
 				// Process as many due tasks as are available.
 				next, ok := q.popReady()
@@ -146,7 +149,7 @@ func (q *Queue) schedule(ctx context.Context) {
 				// empty queue; otherwise the task was in the future, at least as
 				// of the moment when we looked at it.
 				if next.task == nil {
-					q.empty.Signal()
+					q.idle.Set()
 				} else {
 					q.timer.Reset(next.due.Sub(q.Now()))
 				}
