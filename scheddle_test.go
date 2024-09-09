@@ -10,9 +10,12 @@ import (
 
 	"github.com/creachadair/scheddle"
 	"github.com/creachadair/taskgroup"
+	"github.com/fortytw2/leaktest"
 )
 
 func TestQueue_run(t *testing.T) {
+	defer leaktest.Check(t)()
+
 	q := scheddle.NewQueue(nil)
 	defer q.Close()
 
@@ -48,6 +51,8 @@ func TestQueue_run(t *testing.T) {
 }
 
 func TestQueue_repeat(t *testing.T) {
+	defer leaktest.Check(t)()
+
 	q := scheddle.NewQueue(nil)
 	defer q.Close()
 
@@ -66,6 +71,8 @@ func TestQueue_repeat(t *testing.T) {
 }
 
 func TestQueue_Wait(t *testing.T) {
+	defer leaktest.Check(t)()
+
 	t.Run("BeforeFirst", func(t *testing.T) {
 		q := scheddle.NewQueue(nil)
 		defer q.Close()

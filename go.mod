@@ -7,3 +7,5 @@ require (
 	github.com/creachadair/msync v0.3.0
 	github.com/creachadair/taskgroup v0.9.3
 )
+
+require github.com/fortytw2/leaktest v1.3.0
