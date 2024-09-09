@@ -52,13 +52,13 @@ import (
 type Queue struct {
 	// Initialized at construction.
 	now    func() time.Time
-	timer  *time.Timer
 	cancel context.CancelFunc
 	done   chan struct{}
+	timer  *time.Timer
+	idle   msync.Trigger
 
 	μ    sync.Mutex
 	todo *heapq.Queue[entry]
-	idle msync.Trigger
 }
 
 // NewQueue constructs a new empty [Queue] with the specified options.
