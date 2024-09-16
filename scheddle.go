@@ -31,6 +31,7 @@ package scheddle
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -134,7 +135,19 @@ func (q *Queue) schedule(ctx context.Context) {
 				// Process as many due tasks as are available.
 				next, ok := q.popReady()
 				if ok {
-					if err := next.task.Run(ctx); err == nil {
+					err := func() (err error) {
+						// If the task panics, turn the panic into an error so that
+						// the scheduler does not exit.
+						//
+						// TODO(creachadair): Maybe log or pass to a callback.
+						defer func() {
+							if p := recover(); p != nil {
+								err = fmt.Errorf("task panic (recovered): %v", p)
+							}
+						}()
+						return next.task.Run(ctx)
+					}()
+					if err == nil {
 						if r, ok := next.task.(Rescheduler); ok {
 							r.Reschedule(q)
 						}

@@ -70,6 +70,28 @@ func TestQueue_repeat(t *testing.T) {
 	}
 }
 
+func TestQueue_panic(t *testing.T) {
+	defer leaktest.Check(t)()
+
+	q := scheddle.NewQueue(nil)
+	defer q.Close()
+
+	done := make(chan struct{})
+	q.After(10*time.Millisecond, scheddle.Run(func() {
+		panic("failure")
+	}))
+	q.After(20*time.Millisecond, scheddle.Run(func() {
+		close(done)
+	}))
+
+	select {
+	case <-time.After(2 * time.Second):
+		t.Error("Second task did not complete")
+	case <-done:
+		t.Log("Second task completed OK")
+	}
+}
+
 func TestQueue_Wait(t *testing.T) {
 	defer leaktest.Check(t)()
 
