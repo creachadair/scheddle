@@ -13,6 +13,7 @@ import (
 //
 //	func()
 //	func() error
+//	func(context.Context)
 //	func(context.Context) error
 //
 // Any of these types is converted into a Task that runs the function.  For any
@@ -23,6 +24,8 @@ func Run(f any) Task {
 		return runFunc(func(context.Context) error { t(); return nil })
 	case func() error:
 		return runFunc(func(context.Context) error { return t() })
+	case func(context.Context):
+		return runFunc(func(ctx context.Context) error { t(ctx); return nil })
 	case func(context.Context) error:
 		return runFunc(t)
 	case Task:
