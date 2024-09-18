@@ -27,6 +27,20 @@
 // To wait for the queue to become empty without interrupting the scheduler, use:
 //
 //	q.Wait(ctx)
+//
+// # Cancellation
+//
+// Adding a task returns an ID:
+//
+//	id := q.After(10*time.Second, task3)
+//
+// Using this ID, you can cancel the task:
+//
+//	if q.Cancel(id) {
+//	   log.Printf("Task %d successfully cancelled", id)
+//	}
+//
+// Cancel reports false if the task has already been scheduled.
 package scheddle
 
 import (
@@ -58,8 +72,10 @@ type Queue struct {
 	timer  *time.Timer
 	idle   msync.Trigger
 
-	μ    sync.Mutex
-	todo *heapq.Queue[entry]
+	μ      sync.Mutex
+	lastID ID
+	todo   *heapq.Queue[*entry]
+	byID   map[ID]*entry
 }
 
 // NewQueue constructs a new empty [Queue] with the specified options.
@@ -73,7 +89,10 @@ func NewQueue(opts *Options) *Queue {
 		timer:  t,
 		cancel: cancel,
 		done:   make(chan struct{}),
-		todo:   heapq.New(compareEntries),
+		todo: heapq.New(compareEntries).Update(func(e *entry, pos int) {
+			e.pos = pos
+		}),
+		byID: make(map[ID]*entry),
 	}
 	q.idle.Set() // initially idle
 	go q.schedule(ctx)
@@ -103,22 +122,45 @@ func (q *Queue) Wait(ctx context.Context) bool {
 	}
 }
 
-// At schedules task to be executed at the specified time.  If due is in the
-// past, the task will be immediately eligible to run.
-func (q *Queue) At(due time.Time, task Task) {
+// At schedules task to be executed at the specified time and returns its ID.
+// If due is in the past, the task will be immediately eligible to run.
+func (q *Queue) At(due time.Time, task Task) ID {
 	q.μ.Lock()
 	defer q.μ.Unlock()
 
-	if q.todo.Add(entry{due: due, task: task}) == 0 {
-		// Wake up the scheduler.
-		q.idle.Reset()
-		q.timer.Reset(0)
+	q.lastID++
+	e := &entry{due: due, task: task, id: q.lastID}
+	q.byID[e.id] = e
+	if q.todo.Add(e) == 0 {
+		q.wakeScheduler()
 	}
+	return e.id
 }
 
-// After schedules task to be executed after the specified duration.
-// If d ≤ 0, the task will be immediately eligible to run.
-func (q *Queue) After(d time.Duration, task Task) { q.At(q.Now().Add(d), task) }
+// After schedules task to be executed after the specified duration and returns
+// its ID.  If d ≤ 0, the task will be immediately eligible to run.
+func (q *Queue) After(d time.Duration, task Task) ID { return q.At(q.Now().Add(d), task) }
+
+// Cancel cancels the specified task, and reports whether the task was present.
+// If the specified ID did not exist, or corresponds to a task that was already
+// scheduled, Cancel reports false.
+func (q *Queue) Cancel(id ID) bool {
+	q.μ.Lock()
+	defer q.μ.Unlock()
+
+	e, ok := q.byID[id]
+	if !ok {
+		return false
+	}
+	q.todo.Remove(e.pos)
+	delete(q.byID, id)
+	if e.pos == 0 {
+		q.wakeScheduler()
+	}
+	return true
+}
+
+func (q *Queue) wakeScheduler() { q.idle.Reset(); q.timer.Reset(0) }
 
 // Now reports the current time as observed by q.
 func (q *Queue) Now() time.Time { return q.now() }
@@ -145,7 +187,8 @@ func (q *Queue) schedule(ctx context.Context) {
 								err = fmt.Errorf("task panic (recovered): %v", p)
 							}
 						}()
-						return next.task.Run(ctx)
+						rctx := context.WithValue(ctx, taskIDKey{}, next.id)
+						return next.task.Run(rctx)
 					}()
 					if err == nil {
 						if r, ok := next.task.(Rescheduler); ok {
@@ -158,10 +201,10 @@ func (q *Queue) schedule(ctx context.Context) {
 				// Reaching here, no more tasks are due -- either the next task is
 				// in the future, or the queue is (at least momentarily) empty.
 				//
-				// If next.task == nil, it means we got a zero entry due to an
-				// empty queue; otherwise the task was in the future, at least as
-				// of the moment when we looked at it.
-				if next.task == nil {
+				// If next == nil, it means we got a zero entry due to an empty
+				// queue; otherwise the task was in the future, at least as of the
+				// moment when we looked at it.
+				if next == nil {
 					q.idle.Set()
 				} else {
 					q.timer.Reset(next.due.Sub(q.Now()))
@@ -174,8 +217,8 @@ func (q *Queue) schedule(ctx context.Context) {
 
 // popReady returns the frontmost task on the queue, and reports whether it is
 // eligible to be run. If so, the task is popped off the queue before returning.
-// If the queue is empty, it returns entry{}, false.
-func (q *Queue) popReady() (entry, bool) {
+// If the queue is empty, it returns nil, false.
+func (q *Queue) popReady() (*entry, bool) {
 	q.μ.Lock()
 	defer q.μ.Unlock()
 	next, ok := q.todo.Peek(0)
@@ -183,18 +226,36 @@ func (q *Queue) popReady() (entry, bool) {
 		return next, false
 	}
 	q.todo.Pop()
+	delete(q.byID, next.id)
 	return next, true
 }
 
 type entry struct {
 	due  time.Time
 	task Task
+	pos  int
+	id   ID
 }
 
 // compareEntries orders entries non-decreasing by due time.
-func compareEntries(a, b entry) int { return a.due.Compare(b.due) }
+func compareEntries(a, b *entry) int { return a.due.Compare(b.due) }
 
 // Options are optional settings for a [Queue]. A nil Options is ready for use
 // and provides default values as described.  There are currently no options to
 // set; this is reserved for future expansion.
 type Options struct{}
+
+// An ID is a unique identifier assigned to each task added to a Queue.
+// An ID assigned by the Queue is always positive.
+type ID int64
+
+type taskIDKey struct{}
+
+// TaskID returns the task ID associated with ctx, or 0.  The context passed to
+// a running task has this value.
+func TaskID(ctx context.Context) ID {
+	if v, ok := ctx.Value(taskIDKey{}).(ID); ok {
+		return v
+	}
+	return 0
+}

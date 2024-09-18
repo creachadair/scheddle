@@ -107,4 +107,9 @@ func TestQueue_basic(t *testing.T) {
 	for i := range 5 {
 		want(i + 10)
 	}
+
+	// Cleanup check.
+	if len(q.byID) != 0 {
+		t.Errorf("At exit: %d items left in the ID map", len(q.byID))
+	}
 }

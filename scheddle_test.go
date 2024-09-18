@@ -50,6 +50,54 @@ func TestQueue_run(t *testing.T) {
 	}
 }
 
+func TestQueue_Cancel(t *testing.T) {
+	defer leaktest.Check(t)()
+
+	q := scheddle.NewQueue(nil)
+	defer q.Close()
+
+	t.Run("Single", func(t *testing.T) {
+		id := q.After(15*time.Second, scheddle.Run(func() {
+			t.Error("This should not happen")
+		}))
+		t.Logf("Add task id=%v", id)
+		if !q.Cancel(id) {
+			t.Errorf("Cancel(%v): got false, want true", id)
+		}
+		if q.Cancel(id) {
+			t.Errorf("Cancel(%v): got true, want false", id)
+		}
+		q.Wait(context.Background())
+	})
+
+	t.Run("Multiple", func(t *testing.T) {
+		id1 := q.After(15*time.Second, scheddle.Run(func() {
+			t.Error("This should not happen")
+		}))
+		t.Logf("Add task id=%v", id1)
+
+		var id2 scheddle.ID
+		id2 = q.After(20*time.Millisecond, scheddle.Run(func(ctx context.Context) {
+			if got := scheddle.TaskID(ctx); got != id2 {
+				t.Errorf("Task got ID %v, want %v", got, id2)
+			} else {
+				t.Logf("Task %d ran OK", got)
+			}
+		}))
+		t.Logf("Add task id=%v", id2)
+
+		if !q.Cancel(id1) {
+			t.Errorf("Cancel(%v): got false, want true", id1)
+		}
+
+		q.Wait(context.Background())
+
+		if q.Cancel(id2) {
+			t.Errorf("Cancel(%v): got true, want false", id2)
+		}
+	})
+}
+
 func TestQueue_repeat(t *testing.T) {
 	defer leaktest.Check(t)()
 
