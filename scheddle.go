@@ -177,24 +177,17 @@ func (q *Queue) schedule(ctx context.Context) {
 				// Process as many due tasks as are available.
 				next, ok := q.popReady()
 				if ok {
-					err := func() (err error) {
+					// TODO(creachadair): Maybe log or pass to a callback.
+					_ = func() (err error) {
 						// If the task panics, turn the panic into an error so that
 						// the scheduler does not exit.
-						//
-						// TODO(creachadair): Maybe log or pass to a callback.
 						defer func() {
 							if p := recover(); p != nil {
 								err = fmt.Errorf("task panic (recovered): %v", p)
 							}
 						}()
-						rctx := context.WithValue(ctx, taskIDKey{}, next.id)
-						return next.task.Run(rctx)
+						return next.task.Run(q.setContext(ctx, next.id))
 					}()
-					if err == nil {
-						if r, ok := next.task.(Rescheduler); ok {
-							r.Reschedule(q)
-						}
-					}
 					continue // check for another due task
 				}
 
@@ -230,6 +223,13 @@ func (q *Queue) popReady() (*entry, bool) {
 	return next, true
 }
 
+// setContext returns a child of ctx with q and id attached.
+func (q *Queue) setContext(ctx context.Context, id ID) context.Context {
+	ctx = context.WithValue(ctx, taskIDKey{}, id)
+	ctx = context.WithValue(ctx, taskQueueKey{}, q)
+	return ctx
+}
+
 type entry struct {
 	due  time.Time
 	task Task
@@ -250,6 +250,7 @@ type Options struct{}
 type ID int64
 
 type taskIDKey struct{}
+type taskQueueKey struct{}
 
 // TaskID returns the task ID associated with ctx, or 0.  The context passed to
 // a running task has this value.
@@ -258,4 +259,13 @@ func TaskID(ctx context.Context) ID {
 		return v
 	}
 	return 0
+}
+
+// TaskQueue returns the Queue associated with ctx, or nil. The context passed
+// by a queue scheduler has this value set.
+func TaskQueue(ctx context.Context) *Queue {
+	if v, ok := ctx.Value(taskQueueKey{}).(*Queue); ok {
+		return v
+	}
+	return nil
 }

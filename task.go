@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// Run adapts f to a Task. If the concrete type of f satisfies the Task
+// Run adapts f to a [Task]. If the concrete type of f satisfies the Task
 // interface, it is returned directly; otherwise f must be one of:
 //
 //	func()
@@ -56,20 +56,23 @@ type Repeat struct {
 	runs int // number of runs elapsed so far
 }
 
-// Reschedule implements the [Rescheduler] interface. In this implementation,
-// it reschedules r if it has not yet used up its run count, and the time is
-// prior to the specified ending time.
-func (r *Repeat) Reschedule(q *Queue) {
+// Run implements the [Task] interface.
+func (r *Repeat) Run(ctx context.Context) error {
+	if err := r.Task.Run(ctx); err != nil {
+		return err
+	}
 	if r.Every <= 0 {
-		return
+		return nil
 	}
 	r.runs++
 	if r.Count > 0 && r.runs >= r.Count {
-		return
-	} else if !r.End.IsZero() && q.Now().After(r.End) {
-		return
+		return nil
 	}
-	q.After(r.Every, r)
+	q := TaskQueue(ctx)
+	if r.End.IsZero() || q.Now().Before(r.End) {
+		q.After(r.Every, r)
+	}
+	return nil
 }
 
 // A runFunc is a Task that runs by calling the function.
@@ -81,16 +84,9 @@ func (f runFunc) Run(ctx context.Context) error { return f(ctx) }
 // A Task represents a unit of work that can be scheduled by a [Queue].
 // When a task reaches the front of the queue, the scheduler calls Run.
 type Task interface {
-	// Run executes the task and reports success (nil) or an error.  The context
-	// passed to Run will be cancelled if the task is executing when the Queue
-	// is closed.
+	// Run executes the task and reports success (nil) or an error.
+	// The context passed to a task executed by a [Queue] will return useful
+	// values from the [TaskID] and [TaskQueue] functions.  The context will be
+	// cancelled if the task is executing when the Queue is closed.
 	Run(context.Context) error
-}
-
-// Rescheduler is an optional interface that may be implemented by a [Task].
-// If so, then whenever the task successfully completes, its Reschedule method
-// is called to allow it to reschedule itself or other tasks.
-type Rescheduler interface {
-	// Reschedule allows the receiver to add new tasks to q, if it wishes.
-	Reschedule(q *Queue)
 }
