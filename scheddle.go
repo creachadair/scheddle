@@ -50,7 +50,7 @@ import (
 	"time"
 
 	"github.com/creachadair/mds/heapq"
-	"github.com/creachadair/msync"
+	"github.com/creachadair/msync/trigger"
 )
 
 // A Queue implements a basic time-based task queue. Add tasks to the queue
@@ -70,7 +70,7 @@ type Queue struct {
 	cancel context.CancelFunc
 	done   chan struct{}
 	timer  *time.Timer
-	idle   msync.Trigger
+	idle   trigger.Cond
 
 	μ      sync.Mutex
 	lastID ID
