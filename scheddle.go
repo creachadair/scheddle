@@ -89,7 +89,7 @@ func NewQueue(opts *Options) *Queue {
 		timer:  t,
 		cancel: cancel,
 		done:   make(chan struct{}),
-		todo: heapq.New(compareEntries).Update(func(e *entry, pos int) {
+		todo: heapq.New(compareEntries).SetUpdate(func(e *entry, pos int) {
 			e.pos = pos
 		}),
 		byID: make(map[ID]*entry),
