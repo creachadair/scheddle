@@ -2,6 +2,8 @@ github.com/creachadair/mds v0.19.2 h1:I5OdjsrG2jqGklMcyv50Iqo6gTrwUSIpIJVSnlVw85
 github.com/creachadair/mds v0.19.2/go.mod h1:4b//mUiL8YldH6TImXjmW45myzTLNS1LLjOmrk888eg=
 github.com/creachadair/mds v0.25.2 h1:xc0S0AfDq5GX9KUR5sLvi5XjA61/P6S5e0xFs1vA18Q=
 github.com/creachadair/mds v0.25.2/go.mod h1:+s4CFteFRj4eq2KcGHW8Wei3u9NyzSPzNV32EvjyK/Q=
+github.com/creachadair/mds v0.25.3 h1:eE9+aMAV+CooBl5XZKcUuDgQxm7+/f2Of+JT1cX6plM=
+github.com/creachadair/mds v0.25.3/go.mod h1:4hatI3hRM+qhzuAmqPRFvaBM8mONkS7nsLxkcuTYUIs=
 github.com/creachadair/msync v0.4.0 h1:yCcmjnmZQFlXfjQc26iqYtyheS4Yq/moitjSY7rx1xg=
 github.com/creachadair/msync v0.4.0/go.mod h1:rmPVM6r4faONU1ZWBjaRE7D4eY6ouXY6Rx1veLSRpqM=
 github.com/creachadair/taskgroup v0.12.0 h1:AWk1vgMp1VjmwRUJkbX/XZxDRI+gCWhVr+Slj2LeJ+A=
