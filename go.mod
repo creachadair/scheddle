@@ -1,10 +1,10 @@
 module github.com/creachadair/scheddle
 
-go 1.24
+go 1.25
 
 require (
-	github.com/creachadair/mds v0.25.3
-	github.com/creachadair/msync v0.4.0
+	github.com/creachadair/mds v0.25.13
+	github.com/creachadair/msync v0.8.1
 	github.com/creachadair/taskgroup v0.12.0
 )
 
