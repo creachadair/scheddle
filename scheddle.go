@@ -50,6 +50,7 @@ import (
 	"time"
 
 	"github.com/creachadair/mds/heapq"
+	"github.com/creachadair/mds/mctx"
 	"github.com/creachadair/msync/trigger"
 )
 
@@ -225,8 +226,8 @@ func (q *Queue) popReady() (*entry, bool) {
 
 // setContext returns a child of ctx with q and id attached.
 func (q *Queue) setContext(ctx context.Context, id ID) context.Context {
-	ctx = context.WithValue(ctx, taskIDKey{}, id)
-	ctx = context.WithValue(ctx, taskQueueKey{}, q)
+	ctx = taskIDKey.Attach(ctx, id)
+	ctx = taskQueueKey.Attach(ctx, q)
 	return ctx
 }
 
@@ -249,23 +250,13 @@ type Options struct{}
 // An ID assigned by the Queue is always positive.
 type ID int64
 
-type taskIDKey struct{}
-type taskQueueKey struct{}
+var taskIDKey mctx.Key[ID]
+var taskQueueKey mctx.Key[*Queue]
 
 // TaskID returns the task ID associated with ctx, or 0.  The context passed to
 // a running task has this value.
-func TaskID(ctx context.Context) ID {
-	if v, ok := ctx.Value(taskIDKey{}).(ID); ok {
-		return v
-	}
-	return 0
-}
+func TaskID(ctx context.Context) ID { return taskIDKey.Lookup(ctx).Get() }
 
 // TaskQueue returns the Queue associated with ctx, or nil. The context passed
 // by a queue scheduler has this value set.
-func TaskQueue(ctx context.Context) *Queue {
-	if v, ok := ctx.Value(taskQueueKey{}).(*Queue); ok {
-		return v
-	}
-	return nil
-}
+func TaskQueue(ctx context.Context) *Queue { return taskQueueKey.Lookup(ctx).Get() }
