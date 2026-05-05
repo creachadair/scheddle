@@ -250,8 +250,8 @@ type Options struct{}
 // An ID assigned by the Queue is always positive.
 type ID int64
 
-var taskIDKey = mctx.New[ID]("taskID")
-var taskQueueKey = mctx.New[*Queue]("queue")
+var taskIDKey = mctx.NewKey[ID]("taskID")
+var taskQueueKey = mctx.NewKey[*Queue]("queue")
 
 // TaskID returns the task ID associated with ctx, or 0.  The context passed to
 // a running task has this value.
