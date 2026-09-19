@@ -1,11 +1,11 @@
 module github.com/creachadair/scheddle
 
-go 1.25.0
+go 1.26.0
 
 require (
-	github.com/creachadair/mds v0.28.0
-	github.com/creachadair/msync v0.8.4
-	github.com/creachadair/taskgroup v0.12.0
+	github.com/creachadair/mds v0.31.0
+	github.com/creachadair/msync v0.10.1
+	github.com/creachadair/taskgroup v0.14.4
 )
 
 require github.com/fortytw2/leaktest v1.3.0
